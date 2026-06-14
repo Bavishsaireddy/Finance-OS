@@ -1,35 +1,35 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import TransactionRow from "@/components/transactions/TransactionRow";
 import AddTransactionModal from "@/components/transactions/AddTransactionModal";
-import { MOCK_TRANSACTIONS, getAvailableMonths } from "@/lib/mock-data";
-import { CATEGORY_ICONS } from "@/lib/utils";
-import { formatCurrency } from "@/lib/utils";
-import { Search, SlidersHorizontal, Download, Plus, Pencil } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { getAvailableMonths } from "@/lib/analytics";
+import { CATEGORY_ICONS, formatCurrency, cn } from "@/lib/utils";
+import { Search, SlidersHorizontal, Plus, Pencil, ArrowLeftRight } from "lucide-react";
 import type { Transaction } from "@/types";
 
-const MONTH_LABELS: Record<string, string> = {
-  "2026-06": "Jun", "2026-05": "May", "2026-04": "Apr",
-  "2026-03": "Mar", "2026-02": "Feb", "2026-01": "Jan",
-};
-
-const ALL_CATEGORIES = ["All", ...Array.from(new Set(MOCK_TRANSACTIONS.map(t => t.primary_category)))];
-
 export default function TransactionsPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState("All");
-  const [activeMonth, setActiveMonth] = useState<string>("all");
+  const [activeMonth, setActiveMonth] = useState("all");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
   const [addOpen, setAddOpen] = useState(false);
-  const [extras, setExtras] = useState<Transaction[]>([]);
 
-  const months = getAvailableMonths();
-  const allTxns = [...extras, ...MOCK_TRANSACTIONS];
+  const load = () =>
+    fetch("/api/transactions")
+      .then(r => r.json())
+      .then(d => setTransactions(d.transactions ?? []))
+      .finally(() => setLoading(false));
 
-  const filtered = allTxns
+  useEffect(() => { load(); }, []);
+
+  const months = getAvailableMonths(transactions);
+  const allCategories = ["All", ...Array.from(new Set(transactions.map(t => t.primary_category)))];
+
+  const filtered = transactions
     .filter(t => {
       const matchSearch = search === "" ||
         (t.merchant_name || t.name).toLowerCase().includes(search.toLowerCase()) ||
@@ -47,31 +47,24 @@ export default function TransactionsPage() {
   const totalSpend = filtered.filter(t => t.amount > 0 && t.primary_category !== "Income").reduce((s, t) => s + t.amount, 0);
   const totalIncome = filtered.filter(t => t.amount < 0).reduce((s, t) => s + Math.abs(t.amount), 0);
 
-  const handleAdded = (tx: Record<string, unknown>) => {
-    setExtras(prev => [{
-      id: String(tx.id),
-      account_id: String(tx.accountId || "manual"),
-      transaction_id: String(tx.transactionId),
-      amount: Number(tx.amount),
-      date: String(tx.date),
-      name: String(tx.name),
-      merchant_name: tx.merchantName ? String(tx.merchantName) : null,
-      category: [String(tx.primaryCategory)],
-      primary_category: String(tx.primaryCategory),
-      detailed_category: String(tx.primaryCategory),
-      logo_url: null,
-      pending: false,
-      payment_channel: (tx.paymentChannel as "online" | "in store" | "other") || "other",
-    }, ...prev]);
-  };
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <Header title="Transactions" subtitle="Loading…" />
+        <div className="px-6 py-6 space-y-3">
+          {[...Array(6)].map((_, i) => <div key={i} className="bg-bg-card border border-border rounded-xl h-16 animate-pulse" />)}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="animate-fade-in">
-      <Header title="Transactions" subtitle={`${allTxns.length} transactions · ${extras.length} manual`} />
+      <Header title="Transactions" subtitle={`${transactions.length} total`} />
 
       <div className="px-6 py-6 space-y-4">
 
-        {/* Summary cards */}
+        {/* Summary */}
         <div className="grid grid-cols-4 gap-4">
           <div className="bg-bg-card border border-border rounded-xl p-4">
             <p className="text-xs text-text-muted mb-1">Shown</p>
@@ -86,66 +79,40 @@ export default function TransactionsPage() {
             <p className="text-xl font-bold text-success-DEFAULT">+{formatCurrency(totalIncome)}</p>
           </div>
           <div className="bg-bg-card border border-border rounded-xl p-4">
-            <p className="text-xs text-text-muted mb-1">Manual entries</p>
-            <p className="text-xl font-bold text-accent-purple-light">{extras.length}</p>
+            <p className="text-xs text-text-muted mb-1">Net</p>
+            <p className={`text-xl font-bold ${totalIncome - totalSpend >= 0 ? "text-success-DEFAULT" : "text-danger-DEFAULT"}`}>
+              {formatCurrency(totalIncome - totalSpend)}
+            </p>
           </div>
         </div>
 
         {/* Filters */}
         <div className="bg-bg-card border border-border rounded-xl p-4 space-y-3">
           <div className="flex items-center gap-3">
-            {/* Search */}
             <div className="flex-1 flex items-center gap-2 bg-bg-elevated border border-border rounded-lg px-3 py-2">
               <Search className="w-3.5 h-3.5 text-text-muted flex-shrink-0" />
-              <input
-                value={search}
-                onChange={e => setSearch(e.target.value)}
+              <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="Search merchant, category…"
-                className="bg-transparent text-sm text-text-primary outline-none w-full placeholder:text-text-muted"
-              />
+                className="bg-transparent text-sm text-text-primary outline-none w-full placeholder:text-text-muted" />
             </div>
-
-            {/* Month filter */}
-            <select
-              value={activeMonth}
-              onChange={e => setActiveMonth(e.target.value)}
-              className="bg-bg-elevated border border-border text-text-secondary text-xs rounded-lg px-3 py-2 outline-none cursor-pointer"
-            >
+            <select value={activeMonth} onChange={e => setActiveMonth(e.target.value)}
+              className="bg-bg-elevated border border-border text-text-secondary text-xs rounded-lg px-3 py-2 outline-none cursor-pointer">
               <option value="all">All months</option>
-              {months.map(m => (
-                <option key={m} value={m}>{MONTH_LABELS[m] || m}</option>
-              ))}
+              {months.map(m => <option key={m} value={m}>{m}</option>)}
             </select>
-
-            {/* Sort */}
-            <select
-              value={sortBy}
-              onChange={e => setSortBy(e.target.value as "date" | "amount")}
-              className="bg-bg-elevated border border-border text-text-secondary text-xs rounded-lg px-3 py-2 outline-none cursor-pointer"
-            >
+            <select value={sortBy} onChange={e => setSortBy(e.target.value as "date" | "amount")}
+              className="bg-bg-elevated border border-border text-text-secondary text-xs rounded-lg px-3 py-2 outline-none cursor-pointer">
               <option value="date">Sort: Date</option>
               <option value="amount">Sort: Amount</option>
             </select>
-
-            <button className="flex items-center gap-2 bg-bg-elevated border border-border text-text-secondary text-xs rounded-lg px-3 py-2 hover:text-text-primary transition-colors">
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button>
           </div>
-
-          {/* Category chips */}
           <div className="flex items-center gap-2 flex-wrap">
-            {ALL_CATEGORIES.map(cat => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategory(cat)}
-                className={cn(
-                  "text-xs px-3 py-1.5 rounded-full border transition-all",
+            {allCategories.map(cat => (
+              <button key={cat} onClick={() => setActiveCategory(cat)}
+                className={cn("text-xs px-3 py-1.5 rounded-full border transition-all",
                   activeCategory === cat
                     ? "bg-accent-purple/20 border-accent-purple/40 text-accent-purple-light"
-                    : "bg-bg-elevated border-border text-text-muted hover:text-text-secondary hover:border-border-bright"
-                )}
-              >
+                    : "bg-bg-elevated border-border text-text-muted hover:text-text-secondary")}>
                 {cat !== "All" && CATEGORY_ICONS[cat]} {cat}
               </button>
             ))}
@@ -156,27 +123,25 @@ export default function TransactionsPage() {
         <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
           <div className="px-4 py-3 border-b border-border flex items-center justify-between">
             <p className="text-xs font-medium text-text-secondary">{filtered.length} results</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setAddOpen(true)}
-                className="flex items-center gap-1.5 text-xs font-medium text-accent-purple-light hover:underline"
-              >
-                <Pencil className="w-3 h-3" />
-                Add manually
-              </button>
-              <SlidersHorizontal className="w-3.5 h-3.5 text-text-muted" />
-            </div>
+            <button onClick={() => setAddOpen(true)}
+              className="flex items-center gap-1.5 text-xs font-medium text-accent-purple-light hover:underline">
+              <Pencil className="w-3 h-3" /> Add manually
+            </button>
           </div>
-          {filtered.length === 0 ? (
-            <div className="py-16 text-center">
-              <p className="text-text-muted text-sm">No transactions found</p>
-              <button
-                onClick={() => setAddOpen(true)}
-                className="mt-3 flex items-center gap-1.5 text-xs text-accent-purple-light mx-auto hover:underline"
-              >
-                <Plus className="w-3 h-3" />
-                Add one manually
+
+          {transactions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+              <ArrowLeftRight className="w-10 h-10 text-text-disabled" />
+              <p className="text-sm font-medium text-text-secondary">No transactions yet</p>
+              <p className="text-xs text-text-muted">Connect your bank or add one manually</p>
+              <button onClick={() => setAddOpen(true)}
+                className="flex items-center gap-1.5 text-xs text-accent-purple-light hover:underline mt-1">
+                <Plus className="w-3 h-3" /> Add manually
               </button>
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="py-14 text-center">
+              <p className="text-sm text-text-muted">No transactions match your filters</p>
             </div>
           ) : (
             <div className="divide-y divide-border/50">
@@ -187,7 +152,7 @@ export default function TransactionsPage() {
 
       </div>
 
-      <AddTransactionModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={handleAdded} />
+      <AddTransactionModal open={addOpen} onClose={() => setAddOpen(false)} onAdded={load} />
     </div>
   );
 }

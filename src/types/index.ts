@@ -6,20 +6,10 @@ export interface Transaction {
   amount: number;
   date: string;
   name: string;
-  merchant_name?: string | null;
-  merchantName?: string | null;
-  category?: string[];
+  merchant_name: string | null;
   primary_category: string;
-  primaryCategory?: string;
-  detailed_category?: string;
-  detailedCategory?: string;
-  logo_url?: string | null;
-  logoUrl?: string | null;
-  pending: boolean;
   payment_channel: string;
-  paymentChannel?: string;
-  isManual?: boolean;
-  notes?: string | null;
+  pending: boolean;
 }
 
 export interface Account {
@@ -28,20 +18,17 @@ export interface Account {
   itemId: string;
   accountId: string;
   name: string;
-  officialName?: string | null;
   type: string;
-  subtype?: string | null;
+  subtype: string;
   mask: string;
   current_balance: number;
-  currentBalance?: number;
-  available_balance?: number | null;
-  availableBalance?: number | null;
-  credit_limit?: number | null;
-  creditLimit?: number | null;
+  available_balance: number | null;
+  credit_limit: number | null;
   institution_name: string;
-  institutionName?: string;
-  institutionColor?: string;
-  institutionLogo?: string | null;
+  institutionName: string;
+  institution_color: string;
+  institutionColor: string;
+  institutionLogo: string | null;
 }
 
 export interface Budget {
@@ -49,14 +36,10 @@ export interface Budget {
   userId: string;
   category: string;
   limit_amount: number;
-  limitAmount?: number;
   spent_amount: number;
-  spentAmount?: number;
-  period: "monthly" | "weekly" | "yearly";
+  period: string;
   icon: string;
   color: string;
-  createdAt?: Date;
-  updatedAt?: Date;
 }
 
 export interface SpendingCategory {

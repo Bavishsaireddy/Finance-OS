@@ -1,125 +1,263 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import BankCard from "@/components/cards/BankCard";
-import TransactionRow from "@/components/transactions/TransactionRow";
-import { MOCK_ACCOUNTS, MOCK_TRANSACTIONS } from "@/lib/mock-data";
+import ConnectBankButton from "@/components/plaid/ConnectBankButton";
 import { formatCurrency } from "@/lib/utils";
-import { Plus, Shield, Zap } from "lucide-react";
+import type { Account, Transaction } from "@/types";
+import { CreditCard, Landmark, Wallet, PackageOpen, LayoutGrid } from "lucide-react";
+
+function SectionHeader({ icon, label, count, color }: { icon: React.ReactNode; label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center gap-2.5 mb-3">
+      <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${color}`}>
+        {icon}
+      </div>
+      <h2 className="text-sm font-semibold text-text-primary">{label}</h2>
+      <span className="text-xs text-text-muted bg-bg-elevated border border-border px-2 py-0.5 rounded-full">
+        {count}
+      </span>
+    </div>
+  );
+}
 
 export default function CardsPage() {
-  const accounts = MOCK_ACCOUNTS;
-  const creditCards = accounts.filter(a => a.type === "credit");
-  const bankAccounts = accounts.filter(a => a.type === "depository");
-  const totalCredit = creditCards.reduce((s, a) => s + (a.credit_limit || 0), 0);
-  const totalUsed = creditCards.reduce((s, a) => s + Math.abs(a.current_balance), 0);
-  const totalAvailable = totalCredit - totalUsed;
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/plaid/accounts").then(r => r.json()),
+      fetch("/api/transactions").then(r => r.json()),
+    ]).then(([a, t]) => {
+      setAccounts(a.accounts ?? []);
+      setTransactions(t.transactions ?? []);
+    }).finally(() => setLoading(false));
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="animate-fade-in">
+        <Header title="Cards & Accounts" subtitle="Loading…" />
+        <div className="px-6 py-6 space-y-4">
+          <div className="grid grid-cols-5 gap-4">
+            {[...Array(5)].map((_, i) => <div key={i} className="bg-bg-card border border-border rounded-xl h-24 animate-pulse" />)}
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            {[...Array(4)].map((_, i) => <div key={i} className="bg-bg-card border border-border rounded-xl h-48 animate-pulse" />)}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (accounts.length === 0) {
+    return (
+      <div className="animate-fade-in">
+        <Header title="Cards & Accounts" subtitle="No accounts linked" />
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-80px)] gap-5 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-bg-elevated border border-border flex items-center justify-center">
+            <CreditCard className="w-8 h-8 text-text-muted" />
+          </div>
+          <div>
+            <p className="text-base font-semibold text-text-secondary mb-1">No accounts linked yet</p>
+            <p className="text-sm text-text-muted">Connect your bank to see your cards and accounts here.</p>
+          </div>
+          <ConnectBankButton />
+        </div>
+      </div>
+    );
+  }
+
+  // Split accounts into groups
+  const debitCards   = accounts.filter(a => a.type === "depository" && a.subtype === "checking");
+  const bankAccounts = accounts.filter(a => a.type === "depository" && a.subtype !== "checking");
+  const creditCards  = accounts.filter(a => a.type === "credit");
+  const otherCards   = accounts.filter(a => a.type !== "depository" && a.type !== "credit");
+
+  const totalAssets    = accounts.filter(a => a.type === "depository").reduce((s, a) => s + a.current_balance, 0);
+  const totalCreditUsed = creditCards.reduce((s, a) => s + Math.abs(a.current_balance), 0);
+  const totalCreditLimit = creditCards.reduce((s, a) => s + (a.credit_limit ?? 0), 0);
+  const netWorth = totalAssets - totalCreditUsed;
+
+  const summaryCards = [
+    {
+      label: "Total Accounts",
+      value: accounts.length.toString(),
+      sub: `${debitCards.length} debit · ${creditCards.length} credit${otherCards.length ? ` · ${otherCards.length} other` : ""}`,
+      icon: <LayoutGrid className="w-4 h-4 text-accent-purple-light" />,
+      bg: "bg-accent-purple/10",
+      valueClass: "text-text-primary",
+    },
+    {
+      label: "Debit Cards",
+      value: debitCards.length.toString(),
+      sub: debitCards.map(a => `•••• ${a.mask}`).join("  ") || "None linked",
+      icon: <Wallet className="w-4 h-4 text-accent-blue" />,
+      bg: "bg-accent-blue/10",
+      valueClass: "text-text-primary",
+    },
+    {
+      label: "Credit Cards",
+      value: creditCards.length.toString(),
+      sub: totalCreditLimit > 0 ? `${formatCurrency(totalCreditUsed)} used of ${formatCurrency(totalCreditLimit)}` : "None linked",
+      icon: <CreditCard className="w-4 h-4 text-danger-light" />,
+      bg: "bg-danger-muted",
+      valueClass: "text-text-primary",
+    },
+    {
+      label: "Total Assets",
+      value: formatCurrency(totalAssets),
+      sub: "Across all bank accounts",
+      icon: <Landmark className="w-4 h-4 text-success-DEFAULT" />,
+      bg: "bg-success-muted",
+      valueClass: "text-success-DEFAULT",
+    },
+    {
+      label: "Net Worth",
+      value: formatCurrency(netWorth),
+      sub: "Assets minus credit owed",
+      icon: <Wallet className="w-4 h-4 text-accent-purple-light" />,
+      bg: "bg-accent-purple/10",
+      valueClass: netWorth >= 0 ? "text-success-DEFAULT" : "text-danger-DEFAULT",
+    },
+  ];
 
   return (
     <div className="animate-fade-in">
-      <Header title="Cards" subtitle="Manage all your cards and accounts" />
+      <Header title="Cards & Accounts" subtitle={`${accounts.length} account${accounts.length !== 1 ? "s" : ""} linked`} />
 
       <div className="px-6 py-6 space-y-6">
 
-        {/* Credit summary */}
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-bg-card border border-border rounded-xl p-4">
-            <p className="text-xs text-text-muted mb-1">Total Credit Limit</p>
-            <p className="text-xl font-bold text-text-primary">{formatCurrency(totalCredit)}</p>
-          </div>
-          <div className="bg-bg-card border border-border rounded-xl p-4">
-            <p className="text-xs text-text-muted mb-1">Total Used</p>
-            <p className="text-xl font-bold text-danger-DEFAULT">{formatCurrency(totalUsed)}</p>
-          </div>
-          <div className="bg-bg-card border border-border rounded-xl p-4">
-            <p className="text-xs text-text-muted mb-1">Total Available</p>
-            <p className="text-xl font-bold text-success-DEFAULT">{formatCurrency(totalAvailable)}</p>
-          </div>
+        {/* Summary row */}
+        <div className="grid grid-cols-5 gap-4">
+          {summaryCards.map(s => (
+            <div key={s.label} className="bg-bg-card border border-border rounded-xl p-4 hover:border-border-bright transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-text-muted">{s.label}</p>
+                <div className={`w-6 h-6 rounded-lg flex items-center justify-center ${s.bg}`}>{s.icon}</div>
+              </div>
+              <p className={`text-xl font-bold ${s.valueClass}`}>{s.value}</p>
+              <p className="text-[10px] text-text-disabled mt-0.5 truncate">{s.sub}</p>
+            </div>
+          ))}
         </div>
+
+        {/* Debit Cards */}
+        {debitCards.length > 0 && (
+          <div>
+            <SectionHeader
+              icon={<Wallet className="w-3.5 h-3.5 text-accent-blue" />}
+              label="Debit Cards"
+              count={debitCards.length}
+              color="bg-accent-blue/10"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              {debitCards.map(a => <BankCard key={a.id} account={a} />)}
+            </div>
+          </div>
+        )}
 
         {/* Credit Cards */}
-        <div>
-          <h2 className="text-sm font-semibold text-text-primary mb-3">Credit Cards</h2>
-          <div className="grid grid-cols-3 gap-5">
-            {creditCards.map(acc => (
-              <div key={acc.id} className="space-y-4">
-                <BankCard account={acc} />
-                <div className="bg-bg-card border border-border rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Statement closes</span>
-                    <span className="text-text-secondary">Jun 25</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Payment due</span>
-                    <span className="text-warning-DEFAULT font-medium">Jul 15</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Minimum payment</span>
-                    <span className="text-text-secondary">{formatCurrency(Math.abs(acc.current_balance) * 0.02)}</span>
-                  </div>
-                  {acc.credit_limit && (
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text-muted">Utilization</span>
-                      <span className={`font-medium ${(Math.abs(acc.current_balance) / acc.credit_limit) > 0.3 ? "text-warning-DEFAULT" : "text-success-DEFAULT"}`}>
-                        {((Math.abs(acc.current_balance) / acc.credit_limit) * 100).toFixed(0)}%
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-
-            {/* Add card CTA */}
-            <button className="rounded-2xl border-2 border-dashed border-border hover:border-accent-purple/50 bg-bg-elevated hover:bg-bg-card transition-all p-5 flex flex-col items-center justify-center gap-3 group min-h-[180px]">
-              <div className="w-10 h-10 rounded-xl bg-accent-purple/10 flex items-center justify-center group-hover:bg-accent-purple/20 transition-colors">
-                <Plus className="w-5 h-5 text-accent-purple-light" />
-              </div>
-              <div className="text-center">
-                <p className="text-sm font-medium text-text-secondary group-hover:text-text-primary transition-colors">Connect a card</p>
-                <p className="text-[11px] text-text-muted mt-0.5">Link via Plaid</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* Bank Accounts */}
-        <div>
-          <h2 className="text-sm font-semibold text-text-primary mb-3">Bank Accounts</h2>
-          <div className="grid grid-cols-3 gap-5">
-            {bankAccounts.map(acc => (
-              <div key={acc.id} className="space-y-4">
-                <BankCard account={acc} />
-                <div className="bg-bg-card border border-border rounded-xl p-4 space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Account type</span>
-                    <span className="text-text-secondary capitalize">{acc.subtype}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Routing number</span>
-                    <span className="text-text-secondary">•••• 2847</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-text-muted">Status</span>
-                    <span className="flex items-center gap-1 text-success-DEFAULT font-medium">
-                      <span className="w-1.5 h-1.5 rounded-full bg-success-DEFAULT" />Active
-                    </span>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Security note */}
-        <div className="flex items-start gap-3 bg-bg-elevated border border-border rounded-xl p-4">
-          <Shield className="w-4 h-4 text-success-DEFAULT mt-0.5 flex-shrink-0" />
+        {creditCards.length > 0 && (
           <div>
-            <p className="text-xs font-medium text-text-primary">Bank-level security</p>
-            <p className="text-[11px] text-text-muted mt-0.5">Your credentials are never stored. We use Plaid's read-only access with 256-bit encryption.</p>
+            <SectionHeader
+              icon={<CreditCard className="w-3.5 h-3.5 text-danger-light" />}
+              label="Credit Cards"
+              count={creditCards.length}
+              color="bg-danger-muted"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              {creditCards.map(a => <BankCard key={a.id} account={a} />)}
+            </div>
           </div>
-          <div className="flex items-center gap-1 text-[10px] text-text-muted flex-shrink-0">
-            <Zap className="w-3 h-3 text-accent-purple-light" />
-            Powered by Plaid
+        )}
+
+        {/* Bank Accounts (savings, etc.) */}
+        {bankAccounts.length > 0 && (
+          <div>
+            <SectionHeader
+              icon={<Landmark className="w-3.5 h-3.5 text-success-DEFAULT" />}
+              label="Bank Accounts"
+              count={bankAccounts.length}
+              color="bg-success-muted"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              {bankAccounts.map(a => <BankCard key={a.id} account={a} />)}
+            </div>
           </div>
-        </div>
+        )}
+
+        {/* Other (loans, investments, etc.) */}
+        {otherCards.length > 0 && (
+          <div>
+            <SectionHeader
+              icon={<PackageOpen className="w-3.5 h-3.5 text-text-muted" />}
+              label="Other Accounts"
+              count={otherCards.length}
+              color="bg-bg-elevated"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              {otherCards.map(a => <BankCard key={a.id} account={a} />)}
+            </div>
+          </div>
+        )}
+
+        {/* Recent activity */}
+        {transactions.length > 0 && (
+          <div>
+            <h2 className="text-sm font-semibold text-text-primary mb-3">Recent Activity</h2>
+            <div className="bg-bg-card border border-border rounded-xl overflow-hidden">
+              {/* Per-account breakdown header */}
+              <div className="grid grid-cols-4 border-b border-border">
+                {accounts.slice(0, 4).map(a => {
+                  const acctTxns = transactions.filter(t => t.accountId === a.accountId);
+                  const spent = acctTxns.filter(t => t.amount > 0).reduce((s, t) => s + t.amount, 0);
+                  return (
+                    <div key={a.id} className="px-4 py-3 border-r border-border last:border-r-0">
+                      <p className="text-[10px] text-text-muted truncate">{a.name}</p>
+                      <p className="text-xs font-semibold text-text-primary mt-0.5">
+                        {formatCurrency(Math.abs(a.current_balance))}
+                      </p>
+                      <p className="text-[10px] text-text-muted">{acctTxns.length} txns · {formatCurrency(spent)} spent</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Transaction list */}
+              <div className="divide-y divide-border/50">
+                {transactions.slice(0, 10).map(t => {
+                  const account = accounts.find(a => a.accountId === t.accountId);
+                  return (
+                    <div key={t.id} className="flex items-center gap-4 px-4 py-3 hover:bg-bg-elevated transition-colors">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-sm"
+                        style={{ backgroundColor: (account?.institution_color ?? "#7c3aed") + "20" }}
+                      >
+                        {account?.institution_name?.charAt(0) ?? "?"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-text-primary truncate">{t.merchant_name || t.name}</p>
+                        <p className="text-[11px] text-text-muted mt-0.5 truncate">
+                          {account?.name ?? "—"} · {t.primary_category} · {t.date}
+                        </p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className={`text-sm font-semibold ${t.amount < 0 ? "text-success-DEFAULT" : "text-text-primary"}`}>
+                          {t.amount < 0 ? "+" : "-"}{formatCurrency(Math.abs(t.amount))}
+                        </p>
+                        <p className="text-[10px] text-text-muted capitalize">{t.payment_channel}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

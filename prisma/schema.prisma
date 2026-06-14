@@ -8,15 +8,14 @@ datasource db {
 }
 
 model PlaidItem {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   userId          String
-  itemId          String    @unique
+  itemId          String   @unique
   accessToken     String
-  institutionName String?
   institutionId   String?
-  createdAt       DateTime  @default(now())
-
-  accounts Account[]
+  institutionName String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model Account {
@@ -28,17 +27,28 @@ model Account {
   officialName     String?
   type             String
   subtype          String?
-  mask             String   @default("")
+  mask             String
   currentBalance   Float    @default(0)
   availableBalance Float?
   creditLimit      Float?
-  institutionName  String   @default("")
+  institutionName  String
   institutionColor String   @default("#7c3aed")
   institutionLogo  String?
+  createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
 
-  plaidItem    PlaidItem     @relation(fields: [itemId], references: [itemId], onDelete: Cascade)
-  transactions Transaction[]
+model Budget {
+  id          String   @id @default(cuid())
+  userId      String
+  category    String
+  limitAmount Float
+  period      String   @default("monthly")
+  icon        String   @default("📦")
+  color       String   @default("#334155")
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, category])
 }
 
 model Transaction {
@@ -50,28 +60,13 @@ model Transaction {
   date             String
   name             String
   merchantName     String?
-  category         String   @default("[]")
+  category         String?
   primaryCategory  String   @default("Other")
-  detailedCategory String   @default("Other")
-  logoUrl          String?
-  pending          Boolean  @default(false)
+  detailedCategory String?
   paymentChannel   String   @default("other")
+  pending          Boolean  @default(false)
   isManual         Boolean  @default(false)
   notes            String?
   createdAt        DateTime @default(now())
-
-  account Account? @relation(fields: [accountId], references: [accountId], onDelete: Cascade)
-}
-
-model Budget {
-  id          String   @id @default(cuid())
-  userId      String
-  category    String
-  limitAmount Float
-  period      String   @default("monthly")
-  color       String   @default("#7c3aed")
-  icon        String   @default("📦")
-  createdAt   DateTime @default(now())
-
-  @@unique([userId, category, period])
+  updatedAt        DateTime @updatedAt
 }

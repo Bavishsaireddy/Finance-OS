@@ -1,7 +1,8 @@
 "use client";
 
-import { Bell, Search, Plus } from "lucide-react";
+import { Bell, Search } from "lucide-react";
 import { useState } from "react";
+import ConnectBankButton from "@/components/plaid/ConnectBankButton";
 
 interface HeaderProps {
   title: string;
@@ -43,11 +44,7 @@ export default function Header({ title, subtitle }: HeaderProps) {
             <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-accent-purple" />
           </button>
 
-          {/* Connect Bank */}
-          <button className="flex items-center gap-1.5 bg-gradient-purple text-white text-xs font-medium px-3 py-2 rounded-lg hover:opacity-90 transition-opacity shadow-glow">
-            <Plus className="w-3.5 h-3.5" />
-            Connect Bank
-          </button>
+          <ConnectBankButton />
         </div>
       </div>
     </header>

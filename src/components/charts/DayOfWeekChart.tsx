@@ -1,21 +1,19 @@
 "use client";
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Cell, ResponsiveContainer } from "recharts";
-import { DayRow } from "@/lib/analytics";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, CartesianGrid } from "recharts";
+import { DayPoint } from "@/lib/analytics";
 import { formatCurrency } from "@/lib/utils";
 
 interface DayOfWeekChartProps {
-  data: DayRow[];
+  data: DayPoint[];
 }
 
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ payload: DayRow }> }) => {
+const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number }>; label?: string }) => {
   if (!active || !payload?.[0]) return null;
-  const d = payload[0].payload;
   return (
     <div className="bg-bg-card border border-border rounded-xl px-4 py-3 shadow-card">
-      <p className="text-sm font-semibold text-text-primary">{d.day}</p>
-      <p className="text-lg font-bold text-text-primary mt-1">{formatCurrency(d.amount)}</p>
-      <p className="text-xs text-text-muted">{d.count} transaction{d.count !== 1 ? "s" : ""}</p>
+      <p className="text-sm font-medium text-text-secondary">{label}</p>
+      <p className="text-lg font-bold text-text-primary mt-1">{formatCurrency(payload[0].value)}</p>
     </div>
   );
 };
@@ -24,20 +22,18 @@ export default function DayOfWeekChart({ data }: DayOfWeekChartProps) {
   const max = Math.max(...data.map(d => d.amount));
 
   return (
-    <ResponsiveContainer width="100%" height={180}>
-      <BarChart data={data} margin={{ top: 5, right: 5, left: -25, bottom: 0 }} barSize={32}>
+    <ResponsiveContainer width="100%" height={200}>
+      <BarChart data={data} margin={{ top: 5, right: 10, left: -20, bottom: 0 }} barSize={32}>
         <CartesianGrid strokeDasharray="3 3" stroke="#262637" vertical={false} />
-        <XAxis dataKey="short" tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} />
-        <YAxis tick={{ fill: "#475569", fontSize: 10 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
+        <XAxis dataKey="day" tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} />
+        <YAxis tick={{ fill: "#475569", fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={v => `$${v}`} />
         <Tooltip content={<CustomTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
         <Bar dataKey="amount" radius={[6, 6, 0, 0]}>
           {data.map((d, i) => (
             <Cell
               key={i}
-              fill={d.amount === max ? "#7c3aed" : "#1e1e2d"}
-              fillOpacity={d.amount === max ? 1 : 0.9}
-              stroke={d.amount === max ? "#a78bfa" : "transparent"}
-              strokeWidth={1}
+              fill="#7c3aed"
+              fillOpacity={max > 0 ? 0.3 + (d.amount / max) * 0.7 : 0.4}
             />
           ))}
         </Bar>

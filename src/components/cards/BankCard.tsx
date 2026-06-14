@@ -2,15 +2,7 @@
 
 import { Account } from "@/types";
 import { formatCurrency } from "@/lib/utils";
-import { CreditCard, TrendingUp } from "lucide-react";
-import { cn } from "@/lib/utils";
-
-const CARD_GRADIENTS: Record<string, string> = {
-  Chase: "from-[#117ACA] to-[#0a5a9e]",
-  "American Express": "from-[#016FD0] to-[#004a8f]",
-  "Goldman Sachs": "from-[#3a3a3a] to-[#1a1a1a]",
-  default: "from-[#7c3aed] to-[#4f46e5]",
-};
+import { CreditCard, Landmark } from "lucide-react";
 
 interface BankCardProps {
   account: Account;
@@ -18,86 +10,76 @@ interface BankCardProps {
 }
 
 export default function BankCard({ account, compact = false }: BankCardProps) {
-  const gradient = CARD_GRADIENTS[account.institution_name] || CARD_GRADIENTS.default;
   const isCredit = account.type === "credit";
-  const balance = Math.abs(account.current_balance);
-  const usagePercent = isCredit && account.credit_limit
-    ? (balance / account.credit_limit) * 100
-    : null;
-
-  if (compact) {
-    return (
-      <div className={cn("rounded-xl p-4 bg-gradient-to-br card-shine shadow-card", gradient)}>
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-white/70 text-xs font-medium">{account.institution_name}</span>
-          <CreditCard className="w-4 h-4 text-white/50" />
-        </div>
-        <p className="text-white font-semibold text-lg">{formatCurrency(balance)}</p>
-        <p className="text-white/60 text-xs mt-1">•••• {account.mask}</p>
-      </div>
-    );
-  }
+  const balance = account.current_balance;
+  const creditLimit = account.credit_limit;
+  const utilization = isCredit && creditLimit ? (Math.abs(balance) / creditLimit) * 100 : 0;
+  const cardGradient = isCredit
+    ? "from-[#1a1a2e] to-[#16213e]"
+    : "from-[#0d1b2a] to-[#1a2742]";
 
   return (
-    <div className={cn("relative rounded-2xl p-5 bg-gradient-to-br card-shine shadow-card hover:shadow-card-hover transition-shadow duration-300 select-none", gradient)}>
-      {/* Top row */}
-      <div className="flex items-start justify-between mb-6">
-        <div>
-          <p className="text-white/60 text-xs font-medium uppercase tracking-wider">{account.institution_name}</p>
-          <p className="text-white font-semibold text-sm mt-0.5">{account.name}</p>
-        </div>
-        <div className="flex flex-col items-end gap-1">
-          <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-            <CreditCard className="w-4 h-4 text-white/80" />
-          </div>
-          {isCredit && (
-            <span className="text-[10px] text-white/50 uppercase tracking-wider">Credit</span>
-          )}
-        </div>
-      </div>
+    <div
+      className={`relative rounded-2xl bg-gradient-to-br ${cardGradient} border border-white/10 overflow-hidden shadow-card hover:shadow-card-hover transition-shadow`}
+      style={{ borderLeftColor: account.institution_color, borderLeftWidth: 3 }}
+    >
+      {/* Background shimmer */}
+      <div className="absolute inset-0 opacity-5 bg-gradient-to-tr from-white/20 to-transparent pointer-events-none" />
 
-      {/* Card number */}
-      <p className="text-white/50 text-sm font-mono tracking-widest mb-5">
-        •••• •••• •••• {account.mask}
-      </p>
-
-      {/* Balance row */}
-      <div className="flex items-end justify-between">
-        <div>
-          <p className="text-white/50 text-[10px] uppercase tracking-wider mb-1">
-            {isCredit ? "Current Balance" : "Available Balance"}
-          </p>
-          <p className="text-white text-2xl font-bold tracking-tight">{formatCurrency(balance)}</p>
-        </div>
-        {isCredit && account.credit_limit && (
-          <div className="text-right">
-            <p className="text-white/50 text-[10px] uppercase tracking-wider mb-1">Limit</p>
-            <p className="text-white/80 text-sm font-semibold">{formatCurrency(account.credit_limit)}</p>
-          </div>
-        )}
-        {!isCredit && account.available_balance !== null && (
-          <div className="flex items-center gap-1 text-white/70">
-            <TrendingUp className="w-3 h-3" />
-            <span className="text-xs">Healthy</span>
-          </div>
-        )}
-      </div>
-
-      {/* Credit usage bar */}
-      {usagePercent !== null && (
-        <div className="mt-4">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-white/40 text-[10px]">Credit used</span>
-            <span className="text-white/60 text-[10px]">{usagePercent.toFixed(0)}%</span>
-          </div>
-          <div className="h-1 rounded-full bg-white/10">
+      <div className={compact ? "p-4" : "p-5"}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
             <div
-              className={cn("h-full rounded-full transition-all", usagePercent > 80 ? "bg-red-400" : usagePercent > 50 ? "bg-yellow-400" : "bg-green-400")}
-              style={{ width: `${Math.min(usagePercent, 100)}%` }}
-            />
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: account.institution_color + "30" }}
+            >
+              {isCredit
+                ? <CreditCard className="w-4 h-4" style={{ color: account.institution_color }} />
+                : <Landmark className="w-4 h-4" style={{ color: account.institution_color }} />
+              }
+            </div>
+            <p className="text-sm font-semibold text-text-primary">{account.institution_name}</p>
           </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${isCredit ? "bg-danger-muted text-danger-light" : "bg-success-muted text-success-light"}`}>
+            {isCredit ? "Credit" : account.subtype}
+          </span>
         </div>
-      )}
+
+        {/* Card number */}
+        <p className="text-text-muted text-xs font-mono mb-1 tracking-widest">
+          •••• •••• •••• {account.mask}
+        </p>
+        <p className="text-xs text-text-muted mb-4 truncate">{account.name}</p>
+
+        {/* Balance */}
+        <div>
+          <p className="text-[10px] text-text-muted uppercase tracking-wider mb-0.5">
+            {isCredit ? "Balance Owed" : "Available Balance"}
+          </p>
+          <p className={`text-xl font-bold ${isCredit ? "text-danger-light" : "text-text-primary"}`}>
+            {formatCurrency(Math.abs(balance))}
+          </p>
+        </div>
+
+        {/* Credit utilization — only when not compact and is credit */}
+        {isCredit && creditLimit && !compact && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-[10px] text-text-muted">Credit Used</span>
+              <span className="text-[10px] font-semibold text-text-secondary">
+                {utilization.toFixed(0)}% of {formatCurrency(creditLimit)}
+              </span>
+            </div>
+            <div className="h-1.5 rounded-full bg-bg-elevated overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all ${utilization > 80 ? "bg-danger-DEFAULT" : utilization > 50 ? "bg-warning-DEFAULT" : "bg-success-DEFAULT"}`}
+                style={{ width: `${Math.min(utilization, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

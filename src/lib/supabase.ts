@@ -1,2 +1,2 @@
-// Supabase was replaced with Prisma/SQLite. This stub keeps any legacy imports working.
-export { db as supabase, db as supabaseAdmin } from "./db";
+// Supabase client stub — app uses SQLite/Prisma for local storage
+export const supabase = null;

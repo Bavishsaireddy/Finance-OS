@@ -1,20 +1,14 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Plus, DollarSign, Calendar, Tag, Building2, CreditCard, FileText, CheckCircle2 } from "lucide-react";
 import { CATEGORY_COLORS, CATEGORY_ICONS, cn } from "@/lib/utils";
-import { MOCK_ACCOUNTS } from "@/lib/mock-data";
+import type { Account } from "@/types";
 
 const CATEGORIES = [
   "Food and Drink", "Shopping", "Transportation", "Entertainment",
   "Healthcare", "Travel", "Utilities", "Housing", "Education", "Personal", "Other",
 ];
-
-interface AddTransactionModalProps {
-  open: boolean;
-  onClose: () => void;
-  onAdded?: (tx: Record<string, unknown>) => void;
-}
 
 const EMPTY_FORM = {
   amount: "",
@@ -23,13 +17,28 @@ const EMPTY_FORM = {
   merchantName: "",
   primaryCategory: "Food and Drink",
   paymentChannel: "in store" as "online" | "in store" | "other",
-  accountId: MOCK_ACCOUNTS[0].account_id,
+  accountId: "manual",
   notes: "",
   isIncome: false,
 };
 
+interface AddTransactionModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAdded?: (tx?: Record<string, unknown>) => void;
+}
+
 export default function AddTransactionModal({ open, onClose, onAdded }: AddTransactionModalProps) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const [accounts, setAccounts] = useState<Account[]>([]);
+
+  useEffect(() => {
+    if (open) {
+      fetch("/api/plaid/accounts")
+        .then(r => r.json())
+        .then(d => setAccounts(d.accounts ?? []));
+    }
+  }, [open]);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
@@ -230,8 +239,9 @@ export default function AddTransactionModal({ open, onClose, onAdded }: AddTrans
                   onChange={e => setForm(f => ({ ...f, accountId: e.target.value }))}
                   className={cn(inputClass, "cursor-pointer")}
                 >
-                  {MOCK_ACCOUNTS.map(a => (
-                    <option key={a.account_id} value={a.account_id}>
+                  <option value="manual">Manual entry</option>
+                  {accounts.map(a => (
+                    <option key={a.accountId} value={a.accountId}>
                       {a.institution_name} •••• {a.mask} ({a.type})
                     </option>
                   ))}
